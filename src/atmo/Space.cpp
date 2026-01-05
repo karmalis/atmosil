@@ -10,6 +10,7 @@
 
 namespace atmosil::atmo {
 
+    constexpr const int kSolverIterationCount = 20;
     constexpr const float kFlowConst = 0.1;
     constexpr const sf::Vector2f kZeroPos = sf::Vector2f(0.f, 0.f);
     constexpr const float kZeroPressure = 0.f;
@@ -55,7 +56,6 @@ namespace atmosil::atmo {
     }
     void Space::UpdateAtmosphereStepWithDt(const float delta) {
         auto new_pressure = pressure_;
-        //std::ranges::fill(wind_, sf::Vector2f(0.f, 0.f));
 
         for (int y = 0; y < rows_; y++) {
             for (int x = 0; x < cols_; x++) {
@@ -104,22 +104,64 @@ namespace atmosil::atmo {
                         n_it++;
                     }
                 }
-
-                // const auto vel_x = flow[0] - flow[1];
-                // const auto vel_y = flow[2] - flow[3];
-                //
-                // wind_[idx].x = vel_x;
-                // wind_[idx].y = vel_y;
             }
         }
         pressure_ = new_pressure;
 
+        Project();
         Advect(delta);
+        Project();
 
         for (auto& v : wind_) {
             v *= kDragFactor;
         }
     }
+
+    void Space::Project() {
+    std::vector p(rows_ * cols_, 0.0f);
+    std::vector div(rows_ * cols_, 0.0f);
+
+    for (auto y = 1; y < rows_ - 1; y++) {
+        for (auto x = 1; x < cols_ - 1; x++) {
+            const auto idx = y * cols_ + x;
+
+            div[idx] = -0.5f * (
+                 wind_[idx + 1].x - wind_[idx - 1].x +
+                 wind_[idx + cols_].y - wind_[idx - cols_].y
+            ) / cell_size_;
+
+            p[idx] = 0.0f;
+        }
+    }
+
+    for (auto k = 0; k < kSolverIterationCount; k++) {
+        for (auto y = 1; y < rows_ - 1; y++) {
+            for (auto x = 1; x < cols_ - 1; x++) {
+                const auto idx = y * cols_ + x;
+
+                if (walls_.contains(idx)) {
+                     p[idx] = 0;
+                     continue;
+                }
+
+                p[idx] = (div[idx] +
+                          p[idx - 1] + p[idx + 1] +
+                          p[idx - cols_] + p[idx + cols_]) / 4.0f;
+            }
+        }
+    }
+
+    for (auto y = 1; y < rows_ - 1; y++) {
+        for (auto x = 1; x < cols_ - 1; x++) {
+            const auto idx = y * cols_ + x;
+
+            if (walls_.contains(idx)) continue;
+
+            wind_[idx].x -= 0.5f * (p[idx + 1] - p[idx - 1]) * cell_size_;
+            wind_[idx].y -= 0.5f * (p[idx + cols_] - p[idx - cols_]) * cell_size_;
+        }
+    }
+}
 
     void Space::Advect(const float dt) {
         std::vector<float> new_pressure = pressure_;
