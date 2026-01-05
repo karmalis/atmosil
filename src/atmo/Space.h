@@ -19,6 +19,7 @@ namespace atmosil::atmo {
         Space(const int &rows, const int &cols, const float &cell_size);
 
         void UpdateAtmosphereStep();
+        void ComputePressureAndWind(float delta);
         void UpdateAtmosphereStepWithDt(float delta);
 
         void Project();
@@ -27,11 +28,12 @@ namespace atmosil::atmo {
         const std::vector<float> &GetGasPressure() { return pressure_; };\
 
         void AddWall(const int x, const int y);
+        [[nodiscard]] bool IsWall(int index) const;
 
         [[nodiscard]] const sf::Vector2f &GetWindVelocityAt(float x, float y) const;
         [[nodiscard]] const float &GetPressureAt(float x, float y) const;
 
-
+        float GetTotalPressure();
 
     private:
         std::vector<float> pressure_{};
@@ -41,6 +43,7 @@ namespace atmosil::atmo {
         int rows_;
         int cols_;
         float cell_size_;
+
 
 
     };

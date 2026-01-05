@@ -54,12 +54,15 @@ namespace atmosil::atmo {
         UpdateAtmosphereStepWithDt(1.f);
 
     }
-    void Space::UpdateAtmosphereStepWithDt(const float delta) {
+    void Space::ComputePressureAndWind(const float delta) {
         auto new_pressure = pressure_;
 
         for (int y = 0; y < rows_; y++) {
             for (int x = 0; x < cols_; x++) {
                 const auto idx = y * cols_ + x;
+
+                if (IsWall(idx)) continue;
+
                 if (pressure_[idx] <= 0)
                     continue;
 
@@ -75,9 +78,9 @@ namespace atmosil::atmo {
                 float total_outflow = 0.f;
 
                 int n_it = 0;
-                for (const auto neighbor: potential_neighbors) {
+                for (const auto& neighbor: potential_neighbors) {
 
-                    if (!neighbor.valid || walls_.contains(neighbor.idx)) {
+                    if (!neighbor.valid || IsWall(neighbor.idx)) {
                         n_it++;
                         continue;
                     }
@@ -87,10 +90,14 @@ namespace atmosil::atmo {
 
                         sf::Vector2f flow_dir(0.f, 0.f);
 
-                        if (n_it == 0) flow_dir = {1.f, 0.f};
-                        else if (n_it == 1) flow_dir = {-1.f, 0.f};
-                        else if (n_it == 2) flow_dir = {0.f, 1.f};
-                        else if (n_it == 3) flow_dir = {0.f, -1.f};
+                        if (n_it == 0)
+                            flow_dir = {1.f, 0.f};
+                        else if (n_it == 1)
+                            flow_dir = {-1.f, 0.f};
+                        else if (n_it == 2)
+                            flow_dir = {0.f, 1.f};
+                        else if (n_it == 3)
+                            flow_dir = {0.f, -1.f};
 
                         const sf::Vector2f flow_vec = flow_dir * amount_to_move;
 
@@ -107,7 +114,9 @@ namespace atmosil::atmo {
             }
         }
         pressure_ = new_pressure;
-
+    }
+    void Space::UpdateAtmosphereStepWithDt(const float delta) {
+        ComputePressureAndWind(delta);
         Project();
         Advect(delta);
         Project();
@@ -139,7 +148,7 @@ namespace atmosil::atmo {
             for (auto x = 1; x < cols_ - 1; x++) {
                 const auto idx = y * cols_ + x;
 
-                if (walls_.contains(idx)) {
+                if (IsWall(idx)) {
                      p[idx] = 0;
                      continue;
                 }
@@ -155,7 +164,7 @@ namespace atmosil::atmo {
         for (auto x = 1; x < cols_ - 1; x++) {
             const auto idx = y * cols_ + x;
 
-            if (walls_.contains(idx)) continue;
+            if (IsWall(idx)) continue;
 
             wind_[idx].x -= 0.5f * (p[idx + 1] - p[idx - 1]) * cell_size_;
             wind_[idx].y -= 0.5f * (p[idx + cols_] - p[idx - cols_]) * cell_size_;
@@ -172,6 +181,12 @@ namespace atmosil::atmo {
         for (int y = 1; y < rows_ - 1; y++) {
             for (int x = 1; x < cols_ - 1; x++) {
                 const auto idx = y * cols_ + x;
+
+                if (IsWall(idx)) {
+                    new_pressure[idx] = 0.0f;
+                    new_wind[idx] = sf::Vector2f(0.0f, 0.0f);
+                    continue;
+                }
 
                 auto x_prev = x - dt0 * wind_[idx].x;
                 auto y_prev = y - dt0 * wind_[idx].y;
@@ -209,6 +224,11 @@ namespace atmosil::atmo {
         const auto idx = y * cols_ + x;
         walls_.insert(idx);
     }
+    bool Space::IsWall(const int index) const {
+        if (index < 0 || index >= pressure_.size()) return true;
+
+        return walls_.contains(index);
+    }
 
     const sf::Vector2f &Space::GetWindVelocityAt(const float x, const float y) const {
         if (x < 0 || x >= static_cast<float>(cols_ * cell_size_) ||
@@ -242,9 +262,15 @@ namespace atmosil::atmo {
 
         return pressure_[idx];
     }
+    float Space::GetTotalPressure() {
+        //return std::accumulate(pressure_.begin(), pressure_.end(), 0.0f);
 
-
-
+        auto result = 0.0f;
+        for (const auto p: pressure_) {
+            result += p;
+        }
+        return result;
+    }
 
 
 } // namespace atmosil::atmo

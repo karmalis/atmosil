@@ -61,6 +61,9 @@ namespace atmosil::atmo {
 
         sf::Shader velocity_shader_;
         sf::Sprite flow_debug_sprite_;
+
+        float curr_max_pressure_;
+        float curr_pressure_;
     };
 
 } // namespace atmosil::atmo

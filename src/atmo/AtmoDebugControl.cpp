@@ -58,6 +58,11 @@ namespace atmosil::atmo {
         flow_debug_sprite_.setTexture(flow_texture_, true);
 
         particle_system_.UpdateSystem(dt);
+
+        curr_pressure_ = space_.GetTotalPressure();
+        if (curr_pressure_ > curr_max_pressure_) {
+            curr_max_pressure_ = curr_pressure_;
+        }
     }
 
     void AtmoDebugControl::Render(sf::RenderTexture &renderTexture) {
@@ -108,6 +113,9 @@ namespace atmosil::atmo {
         ImGui::RadioButton("Simulation mode", &debug_ui_state_flags.control_state, SimMode);
         ImGui::RadioButton("Wall edit mode", &debug_ui_state_flags.control_state, WallEditMode);
         ImGui::RadioButton("Add particle mode", &debug_ui_state_flags.control_state, AddParticle);
+
+        ImGui::InputFloat("Max Pressure", &curr_max_pressure_);
+        ImGui::InputFloat("Curr Pressure", &curr_pressure_);
 
         switch (debug_ui_state_flags.control_state) {
             case SimMode: {
