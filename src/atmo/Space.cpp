@@ -13,6 +13,7 @@ namespace atmosil::atmo {
     constexpr const float kFlowConst = 0.1;
     constexpr const sf::Vector2f kZeroPos = sf::Vector2f(0.f, 0.f);
     constexpr const float kZeroPressure = 0.f;
+    constexpr const float kDragFactor = 0.99f;
 
     struct PotentialNeighbor {
         int idx;
@@ -50,11 +51,11 @@ namespace atmosil::atmo {
 
     void Space::UpdateAtmosphereStep() {
         UpdateAtmosphereStepWithDt(1.f);
-        Advect(1.f);
+
     }
     void Space::UpdateAtmosphereStepWithDt(const float delta) {
         auto new_pressure = pressure_;
-        std::ranges::fill(wind_, sf::Vector2f(0.f, 0.f));
+        //std::ranges::fill(wind_, sf::Vector2f(0.f, 0.f));
 
         for (int y = 0; y < rows_; y++) {
             for (int x = 0; x < cols_; x++) {
@@ -112,6 +113,12 @@ namespace atmosil::atmo {
             }
         }
         pressure_ = new_pressure;
+
+        Advect(delta);
+
+        for (auto& v : wind_) {
+            v *= kDragFactor;
+        }
     }
 
     void Space::Advect(const float dt) {
