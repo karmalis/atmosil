@@ -48,7 +48,10 @@ namespace atmosil::atmo {
         }
     }
 
-    void Space::UpdateAtmosphereStep() { UpdateAtmosphereStepWithDt(1.f); }
+    void Space::UpdateAtmosphereStep() {
+        UpdateAtmosphereStepWithDt(1.f);
+        Advect(1.f);
+    }
     void Space::UpdateAtmosphereStepWithDt(const float delta) {
         auto new_pressure = pressure_;
         std::ranges::fill(wind_, sf::Vector2f(0.f, 0.f));
@@ -109,6 +112,48 @@ namespace atmosil::atmo {
             }
         }
         pressure_ = new_pressure;
+    }
+
+    void Space::Advect(const float dt) {
+        std::vector<float> new_pressure = pressure_;
+        std::vector<sf::Vector2f> new_wind = wind_;
+
+        const auto dt0 = dt * cell_size_;
+
+        for (int y = 1; y < rows_ - 1; y++) {
+            for (int x = 1; x < cols_ - 1; x++) {
+                const auto idx = y * cols_ + x;
+
+                auto x_prev = x - dt0 * wind_[idx].x;
+                auto y_prev = y - dt0 * wind_[idx].y;
+
+                if (x_prev < 0.5f) x_prev = 0.5f;
+                if (x_prev > cols_ - 1.5f) x_prev = cols_ - 1.5f;
+                if (y_prev < 0.5f) y_prev = 0.5f;
+                if (y_prev > rows_ - 1.5f) y_prev = rows_ - 1.5f;
+
+                const auto i0 = static_cast<int>(x_prev);
+                const auto i1 = i0 + 1;
+                const auto j0 = static_cast<int>(y_prev);
+                const auto j1 = j0 + 1;
+
+                const auto s1 = x_prev - i0;
+                const auto s0 = 1.0f - s1;
+                const auto t1 = y_prev - j0;
+                const auto t0 = 1.0f - t1;
+
+                new_pressure[idx] =
+                    s0 * (t0 * pressure_[j0 * cols_ + i0] + t1 * pressure_[j1 * cols_ + i0]) +
+                    s1 * (t0 * pressure_[j0 * cols_ + i1] + t1 * pressure_[j1 * cols_ + i1]);
+
+                new_wind[idx] =
+                   s0 * (t0 * wind_[j0 * cols_ + i0] + t1 * wind_[j1 * cols_ + i0]) +
+                   s1 * (t0 * wind_[j0 * cols_ + i1] + t1 * wind_[j1 * cols_ + i1]);
+            }
+        }
+
+        pressure_ = new_pressure;
+        wind_ = new_wind;
     }
 
     void Space::AddWall(const int x, const int y) {

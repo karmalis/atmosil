@@ -21,6 +21,7 @@ namespace atmosil::atmo {
         void UpdateAtmosphereStep();
         void UpdateAtmosphereStepWithDt(float delta);
 
+        void Advect(float dt);
 
         const std::vector<float> &GetGasPressure() { return pressure_; };\
 
