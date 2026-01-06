@@ -59,57 +59,63 @@ namespace atmosil::atmo {
 
         for (int y = 0; y < rows_; y++) {
             for (int x = 0; x < cols_; x++) {
-                const auto idx = y * cols_ + x;
+                const auto index = y * cols_ + x;
 
-                if (IsWall(idx)) continue;
+                if (IsWall(index)) continue;
 
-                if (pressure_[idx] <= 0)
+                if (pressure_[index] <= 0.1)
                     continue;
 
                 // TODO: Consider 8 surrounding spaces for gas expansion
                 const PotentialNeighbor potential_neighbors[] = {
-                        {idx + 1, x < cols_ - 1}, // right
-                        {idx - 1, x > 0}, // left
-                        {idx + cols_, y < rows_ - 1}, // bottom
-                        {idx - cols_, y > 0}, // top
+                        {index + 1, x < cols_ - 1}, // right
+                        {index - 1, x > 0}, // left
+                        {index + cols_, y < rows_ - 1}, // bottom
+                        {index - cols_, y > 0}, // top
                 };
 
-                std::vector flow{0.f, 0.f, 0.f, 0.f};
-                float total_outflow = 0.f;
+                float total_desired_flow = 0.f;
+                std::vector<float> desired_flows;
+                desired_flows.reserve(4); // directions
 
-                int n_it = 0;
-                for (const auto& neighbor: potential_neighbors) {
-
-                    if (!neighbor.valid || IsWall(neighbor.idx)) {
-                        n_it++;
+                for (const auto &[n_idx, valid]: potential_neighbors) {
+                    if (!valid || IsWall(n_idx)) {
+                        desired_flows.push_back(0.f);
                         continue;
                     }
 
-                    if (const auto diff = pressure_[idx] - pressure_[neighbor.idx]; diff > 0) {
-                        const auto amount_to_move = diff * kFlowConst * delta;
-
-                        sf::Vector2f flow_dir(0.f, 0.f);
-
-                        if (n_it == 0)
-                            flow_dir = {1.f, 0.f};
-                        else if (n_it == 1)
-                            flow_dir = {-1.f, 0.f};
-                        else if (n_it == 2)
-                            flow_dir = {0.f, 1.f};
-                        else if (n_it == 3)
-                            flow_dir = {0.f, -1.f};
-
-                        const sf::Vector2f flow_vec = flow_dir * amount_to_move;
-
-                        wind_[idx] += flow_vec;
-                        wind_[neighbor.idx] += flow_vec;
-
-                        flow[n_it] = amount_to_move;
-                        total_outflow += amount_to_move;
-                        new_pressure[idx] -= amount_to_move;
-                        new_pressure[neighbor.idx] += amount_to_move;
-                        n_it++;
+                    if (const auto diff = pressure_[index] - pressure_[n_idx]; diff > 0) {
+                        const auto flow = diff * kFlowConst * delta;
+                        desired_flows.push_back(flow);
+                        total_desired_flow += flow;
+                    } else {
+                        desired_flows.push_back(0.f);
                     }
+                }
+
+                auto scaler = 1.0f;
+                if (total_desired_flow > pressure_[index]) {
+                    scaler = pressure_[index] / total_desired_flow;
+                }
+
+                auto n_it = 0;
+                for (const auto &[n_idx, valid]: potential_neighbors) {
+                    if (const float amount_to_move = desired_flows[n_it] * scaler; amount_to_move > 0) {
+                        sf::Vector2f flow_dir{0.f, 0.f};
+                        if (n_it == 0) flow_dir = {1.f, 0.f};
+                        else if (n_it == 1) flow_dir = {-1.f, 0.f};
+                        else if (n_it == 2) flow_dir = {0.f, 1.f};
+                        else if (n_it == 3) flow_dir = {0.f, -1.f};
+
+                        const auto flow_vec = flow_dir * amount_to_move;
+
+                        wind_[index] += flow_vec;
+                        wind_[n_idx] += flow_vec;
+
+                        new_pressure[index] -= amount_to_move;
+                        new_pressure[n_idx] += amount_to_move;
+                    }
+                    n_it++;
                 }
             }
         }
@@ -262,7 +268,7 @@ namespace atmosil::atmo {
 
         return pressure_[idx];
     }
-    float Space::GetTotalPressure() {
+    float Space::GetTotalPressure() const {
         //return std::accumulate(pressure_.begin(), pressure_.end(), 0.0f);
 
         auto result = 0.0f;

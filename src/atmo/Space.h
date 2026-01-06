@@ -33,7 +33,7 @@ namespace atmosil::atmo {
         [[nodiscard]] const sf::Vector2f &GetWindVelocityAt(float x, float y) const;
         [[nodiscard]] const float &GetPressureAt(float x, float y) const;
 
-        float GetTotalPressure();
+        float GetTotalPressure() const;
 
     private:
         std::vector<float> pressure_{};
